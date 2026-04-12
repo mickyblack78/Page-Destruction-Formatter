@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAGE DESTRUCTION FORMATTER</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <style>
+        :root { --bg: #050505; --accent: #ff0000; --panel: #111; --text: #eee; }
+        body { background: var(--bg); color: var(--text); font-family: 'Courier New', Courier, monospace; margin: 0; overflow: hidden; }
+        #header { padding: 10px 20px; background: #000; border-bottom: 2px solid var(--accent); display: flex; align-items: baseline; }
+        .logo-large { font-size: 64px; font-weight: 900; color: var(--accent); margin-right: 15px; line-height: 1; }
+        .title-small { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #666; }
+        #app-container { display: grid; grid-template-columns: 200px 1fr; height: calc(100vh - 80px); }
+        #sidebar { background: var(--panel); border-right: 1px solid #333; padding: 15px; display: flex; flex-direction: column; gap: 20px; }
+        .menu-label { font-weight: bold; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; }
+        .sub-btn { background: #1a1a1a; border: 1px solid #333; color: #aaa; text-align: left; padding: 8px 12px; cursor: pointer; font-size: 13px; width: 100%; margin-bottom: 5px; }
+        .sub-btn:hover { background: #222; color: var(--accent); }
+        #stage { overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: #222; padding: 20px; position: relative; }
+        #pdf-render { background: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); padding: 40px; color: #000; }
+        #injection-panel { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 1px solid var(--accent); padding: 15px; display: flex; flex-direction: column; gap: 10px; width: 250px; }
+        input, select { background: #222; border: 1px solid #444; color: white; padding: 5px; }
+        .cast-btn { background: var(--accent); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="header">
+    <div class="logo-large">PDF</div>
+    <div class="title-small">PAGE DESTRUCTION FORMATTER</div>
+</div>
+
+<div id="app-container">
+    <div id="sidebar">
+        <div class="menu-label">FILE</div>
+        <button class="sub-btn" onclick="document.getElementById('file-input').click()">IMPORT PDF</button>
+        <input type="file" id="file-input" style="display:none" accept="application/pdf">
+        <button class="sub-btn" id="export-trigger" style="color:white; border-color:var(--accent);">EXPORT/CAST</button>
+        
+        <div class="menu-label" style="margin-top:20px;">VIEW</div>
+        <div id="history-status" style="font-size:11px; color:#555;">IDLE</div>
+    </div>
+
+    <div id="stage">
+        <div id="pdf-render">
+            <div id="status-text">NO PDF LOADED</div>
+        </div>
+
+        <div id="injection-panel">
+            <div style="font-size: 10px; color: #888;">COORDINATE INJECTION</div>
+            <input type="text" id="inj-text" placeholder="TEXT...">
+            <div style="display:flex; gap: 5px;">
+                <input type="number" id="inj-x" placeholder="X" value="50" style="width:50%">
+                <input type="number" id="inj-y" placeholder="Y" value="50" style="width:50%">
+            </div>
+            <select id="inj-size">
+                <option value="12">12pt</option>
+                <option value="32">32pt</option>
+                <option value="64">64pt</option>
+            </select>
+            <button class="cast-btn" id="apply-injection">INJECT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let pdfBytes = null;
+    const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+    // 1. IMPORT
+    document.getElementById('file-input').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            pdfBytes = ev.target.result;
+            document.getElementById('status-text').innerText = "LOADED: " + file.name;
+            document.getElementById('history-status').innerText = file.name;
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    // 2. INJECT
+    document.getElementById('apply-injection').onclick = async () => {
+        if (!pdfBytes) return alert("IMPORT FIRST");
+        const doc = await PDFDocument.load(pdfBytes);
+        const page = doc.getPages()[0];
+        const font = await doc.embedFont(StandardFonts.CourierBold);
+        
+        page.drawText(document.getElementById('inj-text').value || "DESTRUCTION", {
+            x: parseInt(document.getElementById('inj-x').value),
+            y: parseInt(document.getElementById('inj-y').value),
+            size: parseInt(document.getElementById('inj-size').value),
+            font: font,
+            color: rgb(1, 0, 0)
+        });
+        
+        pdfBytes = await doc.save();
+        alert("MERGED");
+    };
+
+    // 3. EXPORT (The "Just Works" Data URI Method)
+    document.getElementById('export-trigger').onclick = async () => {
+        if (!pdfBytes) return;
+        
+        // Convert the PDF to a Base64 string
+        const base64 = btoa(new Uint8Array(pdfBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        
+        // Create the "Direct" link
+        const link = document.createElement('a');
+        link.href = "data:application/pdf;base64," + base64;
+        link.download = "DESTRUCTED_PAGE.pdf";
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>
+</body>
+</html>
