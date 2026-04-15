@@ -2,119 +2,148 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAGE DESTRUCTION FORMATTER</title>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sovereign Stamper v1.8</title>
     <style>
-        :root { --bg: #050505; --accent: #ff0000; --panel: #111; --text: #eee; }
-        body { background: var(--bg); color: var(--text); font-family: 'Courier New', Courier, monospace; margin: 0; overflow: hidden; }
-        #header { padding: 10px 20px; background: #000; border-bottom: 2px solid var(--accent); display: flex; align-items: baseline; }
-        .logo-large { font-size: 64px; font-weight: 900; color: var(--accent); margin-right: 15px; line-height: 1; }
-        .title-small { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #666; }
-        #app-container { display: grid; grid-template-columns: 200px 1fr; height: calc(100vh - 80px); }
-        #sidebar { background: var(--panel); border-right: 1px solid #333; padding: 15px; display: flex; flex-direction: column; gap: 20px; }
-        .menu-label { font-weight: bold; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; }
-        .sub-btn { background: #1a1a1a; border: 1px solid #333; color: #aaa; text-align: left; padding: 8px 12px; cursor: pointer; font-size: 13px; width: 100%; margin-bottom: 5px; }
-        .sub-btn:hover { background: #222; color: var(--accent); }
-        #stage { overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: #222; padding: 20px; position: relative; }
-        #pdf-render { background: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); padding: 40px; color: #000; }
-        #injection-panel { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.9); border: 1px solid var(--accent); padding: 15px; display: flex; flex-direction: column; gap: 10px; width: 250px; }
-        input, select { background: #222; border: 1px solid #444; color: white; padding: 5px; }
-        .cast-btn { background: var(--accent); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+        :root { --neon: #39FF14; --bg: #111; }
+        body { margin: 0; background: var(--bg); color: var(--neon); font-family: monospace; overflow: hidden; touch-action: none; }
+        
+        /* The Neon Perimeter (User Choice) */
+        #house { position: fixed; inset: 5px; border: 3px solid var(--neon); pointer-events: none; z-index: 50; transition: border-color 0.3s; }
+        
+        #hud { position: fixed; top: 8px; width: 100%; display: flex; justify-content: space-around; font-size: 10px; z-index: 100; text-shadow: 1px 1px #000; }
+        
+        #workspace { width: 100vw; height: 100vh; overflow: auto; background: #222; position: relative; }
+        #canvas-wrap { position: absolute; transform-origin: 0 0; top: 45px; left: 10px; }
+        canvas { background: white; display: block; }
+
+        /* The Ghost Pen (Movable/Stretchable) */
+        #plate { 
+            position: absolute; z-index: 200; color: #000; 
+            background: rgba(255, 255, 255, 0.3); border: 1px dashed #555;
+            padding: 5px; cursor: move; touch-action: none;
+            display: inline-block; white-space: nowrap; font-weight: bold;
+        }
+
+        #sigPad { 
+            position: fixed; top: 20%; left: 10%; width: 80%; height: 30%; 
+            background: #fff; border: 2px solid var(--neon); z-index: 300; display: none; 
+        }
+
+        #controls { position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid var(--neon); padding: 10px 5px 20px 5px; display: flex; flex-direction: column; gap: 6px; z-index: 400; }
+        .row { display: flex; gap: 4px; overflow-x: auto; padding: 2px; }
+        
+        button, input { background: #111; color: var(--neon); border: 1px solid var(--neon); padding: 10px; font-size: 12px; border-radius: 4px; flex-shrink: 0; }
+        #textInput { flex-grow: 1; min-width: 100px; }
     </style>
 </head>
 <body>
 
-<div id="header">
-    <div class="logo-large">PDF</div>
-    <div class="title-small">PAGE DESTRUCTION FORMATTER</div>
+<div id="house"></div>
+<div id="hud">F: <b id="hudF">24</b> | Z: <b id="hudZ">1.0</b> | R: <b id="hudR">0</b>°</div>
+
+<div id="sigPad">
+    <canvas id="sigCanvas" style="width:100%; height:100%; background:transparent;"></canvas>
+    <div style="position:absolute; bottom:5px; right:5px;">
+        <button onclick="closeSig(true)">STAMP SIG</button>
+        <button onclick="closeSig(false)" style="color:red">X</button>
+    </div>
 </div>
 
-<div id="app-container">
-    <div id="sidebar">
-        <div class="menu-label">FILE</div>
-        <button class="sub-btn" onclick="document.getElementById('file-input').click()">IMPORT PDF</button>
-        <input type="file" id="file-input" style="display:none" accept="application/pdf">
-        <button class="sub-btn" id="export-trigger" style="color:white; border-color:var(--accent);">EXPORT/CAST</button>
-        
-        <div class="menu-label" style="margin-top:20px;">VIEW</div>
-        <div id="history-status" style="font-size:11px; color:#555;">IDLE</div>
+<div id="workspace">
+    <div id="canvas-wrap" id="wrap">
+        <canvas id="mainCanvas"></canvas>
+        <div id="plate">DRAG ME</div>
     </div>
+</div>
 
-    <div id="stage">
-        <div id="pdf-render">
-            <div id="status-text">NO PDF LOADED</div>
-        </div>
-
-        <div id="injection-panel">
-            <div style="font-size: 10px; color: #888;">COORDINATE INJECTION</div>
-            <input type="text" id="inj-text" placeholder="TEXT...">
-            <div style="display:flex; gap: 5px;">
-                <input type="number" id="inj-x" placeholder="X" value="50" style="width:50%">
-                <input type="number" id="inj-y" placeholder="Y" value="50" style="width:50%">
-            </div>
-            <select id="inj-size">
-                <option value="12">12pt</option>
-                <option value="32">32pt</option>
-                <option value="64">64pt</option>
-            </select>
-            <button class="cast-btn" id="apply-injection">INJECT</button>
-        </div>
+<div id="controls">
+    <div class="row">
+        <input type="text" id="textInput" placeholder="Ink..." oninput="update()">
+        <button onclick="stamp()" style="background:var(--neon); color:#000;">BURN</button>
+        <button onclick="toggleSig()">SIGN</button>
+    </div>
+    <div class="row">
+        Size: <input type="range" id="fSize" min="10" max="200" value="24" oninput="update()">
+        Tilt: <input type="range" id="rot" min="-180" max="180" value="0" oninput="update()">
+    </div>
+    <div class="row">
+        <button onclick="cycleNeon()">GLOW</button>
+        <button onclick="document.getElementById('loader').click()">LOAD</button>
+        <input type="file" id="loader" hidden accept="image/*">
+        <button onclick="changeZoom(0.2)">Z+</button>
+        <button onclick="changeZoom(-0.2)">Z-</button>
+        <button onclick="undo()">UNDO</button>
+        <button onclick="exportImg()">EXPORT</button>
     </div>
 </div>
 
 <script>
-    let pdfBytes = null;
-    const { PDFDocument, rgb, StandardFonts } = PDFLib;
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
+    const wrap = document.getElementById('canvas-wrap'), plate = document.getElementById('plate');
+    const house = document.getElementById('house'), textInput = document.getElementById('textInput');
+    const sCanvas = document.getElementById('sigCanvas'), sCtx = sCanvas.getContext('2d');
+    
+    let docImg = new Image(), zoom = 1.0, history = [], posX = 20, posY = 20, sigImg = null;
+    const colors = ['#39FF14', '#00F3FF', '#FF073A', '#FFF000'];
+    let cIdx = 0;
 
-    // 1. IMPORT
-    document.getElementById('file-input').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            pdfBytes = ev.target.result;
-            document.getElementById('status-text').innerText = "LOADED: " + file.name;
-            document.getElementById('history-status').innerText = file.name;
-        };
-        reader.readAsArrayBuffer(file);
-    };
+    // Cycle Neon Border
+    function cycleNeon() { cIdx = (cIdx + 1) % colors.length; document.documentElement.style.setProperty('--neon', colors[cIdx]); }
 
-    // 2. INJECT
-    document.getElementById('apply-injection').onclick = async () => {
-        if (!pdfBytes) return alert("IMPORT FIRST");
-        const doc = await PDFDocument.load(pdfBytes);
-        const page = doc.getPages()[0];
-        const font = await doc.embedFont(StandardFonts.CourierBold);
-        
-        page.drawText(document.getElementById('inj-text').value || "DESTRUCTION", {
-            x: parseInt(document.getElementById('inj-x').value),
-            y: parseInt(document.getElementById('inj-y').value),
-            size: parseInt(document.getElementById('inj-size').value),
-            font: font,
-            color: rgb(1, 0, 0)
-        });
-        
-        pdfBytes = await doc.save();
-        alert("MERGED");
-    };
+    // Floating Plate Movement
+    plate.addEventListener('touchstart', e => e.preventDefault());
+    plate.addEventListener('touchmove', e => {
+        const t = e.touches[0], r = canvas.getBoundingClientRect();
+        posX = (t.pageX - r.left)/zoom - (plate.offsetWidth/2);
+        posY = (t.pageY - r.top)/zoom - (plate.offsetHeight/2);
+        plate.style.left = posX + "px"; plate.style.top = posY + "px";
+    });
 
-    // 3. EXPORT (The "Just Works" Data URI Method)
-    document.getElementById('export-trigger').onclick = async () => {
-        if (!pdfBytes) return;
-        
-        // Convert the PDF to a Base64 string
-        const base64 = btoa(new Uint8Array(pdfBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-        
-        // Create the "Direct" link
-        const link = document.createElement('a');
-        link.href = "data:application/pdf;base64," + base64;
-        link.download = "DESTRUCTED_PAGE.pdf";
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    // Signature Logic
+    function toggleSig() { document.getElementById('sigPad').style.display = 'block'; sCanvas.width = sCanvas.offsetWidth; sCanvas.height = sCanvas.offsetHeight; }
+    let drawing = false;
+    sCanvas.addEventListener('touchstart', () => drawing = true);
+    sCanvas.addEventListener('touchend', () => drawing = false);
+    sCanvas.addEventListener('touchmove', e => {
+        if(!drawing) return;
+        const t = e.touches[0], r = sCanvas.getBoundingClientRect();
+        sCtx.lineWidth = 3; sCtx.lineCap = 'round'; sCtx.strokeStyle = '#000';
+        sCtx.lineTo(t.clientX - r.left, t.clientY - r.top); sCtx.stroke(); sCtx.beginPath(); sCtx.moveTo(t.clientX - r.left, t.clientY - r.top);
+    });
+    function closeSig(keep) {
+        if(keep) { sigImg = new Image(); sigImg.src = sCanvas.toDataURL(); plate.innerHTML = ''; plate.appendChild(sigImg); }
+        document.getElementById('sigPad').style.display = 'none'; sCtx.clearRect(0,0,sCanvas.width,sCanvas.height);
+    }
+
+    // Load & Draw
+    document.getElementById('loader').onchange = e => {
+        const r = new FileReader();
+        r.onload = f => { docImg.src = f.target.result; docImg.onload = () => { canvas.width = docImg.width; canvas.height = docImg.height; saveHistory(); draw(); }; };
+        r.readAsDataURL(e.target.files[0]);
     };
+    function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(docImg, 0, 0); update(); }
+    function update() {
+        const s = document.getElementById('fSize').value, r = document.getElementById('rot').value;
+        document.getElementById('hudF').innerText = s; document.getElementById('hudZ').innerText = zoom.toFixed(1); document.getElementById('hudR').innerText = r;
+        wrap.style.transform = `scale(${zoom})`;
+        if(!sigImg) plate.innerText = textInput.value || "DRAG ME";
+        plate.style.fontSize = s + "px"; plate.style.transform = `rotate(${r}deg)`;
+    }
+
+    function stamp() {
+        if(!docImg.src) return; saveHistory();
+        const s = document.getElementById('fSize').value, r = document.getElementById('rot').value * Math.PI / 180;
+        ctx.save(); ctx.translate(posX + plate.offsetWidth/2, posY + plate.offsetHeight/2); ctx.rotate(r);
+        if(sigImg) { ctx.drawImage(sigImg, -plate.offsetWidth/2, -plate.offsetHeight/2, plate.offsetWidth, plate.offsetHeight); sigImg = null; plate.innerHTML = ''; }
+        else { ctx.font = `bold ${s}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(textInput.value, 0, 0); }
+        ctx.restore(); docImg.src = canvas.toDataURL(); textInput.value = ""; update();
+    }
+
+    function changeZoom(v) { zoom = Math.max(0.1, zoom + v); update(); }
+    function saveHistory() { history.push(canvas.toDataURL()); if(history.length > 10) history.shift(); }
+    function undo() { if(history.length > 1) { history.pop(); docImg.src = history[history.length-1]; docImg.onload = () => draw(); } }
+    function exportImg() { const a = document.createElement('a'); a.download = "Sovereign_Doc.png"; a.href = canvas.toDataURL(); a.click(); }
 </script>
 </body>
 </html>
