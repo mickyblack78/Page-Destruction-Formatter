@@ -84,6 +84,8 @@
 </div>
 
 <div id="ui-layer">
+    <input type="file" id="file_input" style="display:none" accept="image/*,.html,.txt,.js">
+    <button onclick="document.getElementById('file_input').click()">LOAD MEDIA</button>
     <button class="glass-pill" onclick="document.getElementById('fileIn').click()">LOAD</button>
     <input type="file" id="fileIn" hidden accept="image/*">
     <button class="glass-pill" onclick="toggleSign()">SIGN</button>
