@@ -3,167 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sovereign Stamper v1.9</title>
+    <title>Sovereign Lens v2.0</title>
     <style>
         :root { --neon: #39FF14; }
-        body { margin: 0; background: #111; color: var(--neon); font-family: monospace; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
         
-        #house { position: fixed; inset: 4px; border: 2px solid var(--neon); pointer-events: none; z-index: 50; transition: border-color 0.3s; }
-        #hud { position: fixed; top: 10px; width: 100%; display: flex; justify-content: space-around; font-size: 10px; z-index: 100; pointer-events: none; }
-        
-        #workspace { width: 100vw; height: 100vh; overflow: auto; background: #1a1a1a; position: relative; }
-        #canvas-wrap { position: absolute; transform-origin: 0 0; top: 0; left: 0; padding: 200px; }
-        canvas { background: white; display: block; box-shadow: 0 0 40px #000; }
+        /* The Pulsing Neon Perimeter (3-Second Cycle) */
+        #perimeter { 
+            position: fixed; inset: 0; border: 4px solid var(--neon); 
+            pointer-events: none; z-index: 1000;
+            animation: pulseColor 12s infinite; 
+        }
+        @keyframes pulseColor {
+            0%, 25% { border-color: #39FF14; } /* Green */
+            26%, 50% { border-color: #00F3FF; } /* Blue */
+            51%, 75% { border-color: #FF073A; } /* Red */
+            76%, 100% { border-color: #FFF000; } /* Yellow */
+        }
 
-        /* Direct Interaction Plate */
-        #plate { 
-            position: absolute; z-index: 200; color: #000; 
-            background: rgba(255, 255, 255, 0.4); border: 1px dashed var(--neon);
-            padding: 8px; cursor: move; touch-action: none;
+        /* The Document World */
+        #viewport { width: 100vw; height: 100vh; display: flex; align-items: flex-start; justify-content: center; }
+        #canvas-wrap { position: relative; transform-origin: top center; }
+        canvas { display: block; max-width: 100%; height: auto; }
+
+        /* The Magic Stamp (Floating Pen) */
+        #stamp { 
+            position: absolute; z-index: 500; color: #000; 
+            background: rgba(255, 255, 255, 0.4); border: 1px dashed rgba(0,0,0,0.5);
+            padding: 10px; cursor: move; touch-action: none;
             display: inline-block; white-space: nowrap; font-weight: bold;
-            min-width: 20px; min-height: 20px;
+            border-radius: 4px;
         }
 
-        #hiddenInput { position: fixed; top: -100px; opacity: 0; }
-
-        #sigPad { 
-            position: fixed; top: 15%; left: 5%; width: 90%; height: 40%; 
-            background: #fff; border: 3px solid var(--neon); z-index: 500; display: none; 
+        /* Glassmorphic Organic Buttons */
+        #ui-layer { position: fixed; bottom: 20px; width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; z-index: 1100; pointer-events: none; }
+        .glass-pill { 
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.15); 
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 20px; border-radius: 50px; 
+            color: #fff; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-
-        #controls { position: fixed; bottom: 0; width: 100%; background: rgba(0,0,0,0.9); border-top: 1px solid var(--neon); padding: 10px 0 25px 0; display: flex; flex-direction: column; gap: 8px; z-index: 400; }
-        .row { display: flex; gap: 5px; justify-content: center; padding: 0 10px; }
+        .btn-save { background: rgba(57, 255, 20, 0.2); border: 1px solid var(--neon); }
         
-        button, input[type="range"] { background: #000; color: var(--neon); border: 1px solid var(--neon); padding: 12px; font-size: 12px; border-radius: 4px; }
-        input[type="range"] { flex-grow: 1; }
-        .btn-main { background: var(--neon); color: #000; font-weight: bold; border: none; }
+        #sig-zone { 
+            position: fixed; top: 20%; left: 5%; width: 90%; height: 35%; 
+            background: white; border-radius: 20px; z-index: 2000; display: none; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        #hiddenText { position: fixed; top: -100px; opacity: 0; }
+        #sliders { position: fixed; top: 60px; width: 80%; left: 10%; z-index: 1100; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        input[type="range"] { pointer-events: auto; width: 100%; accent-color: var(--neon); }
     </style>
 </head>
 <body>
 
-<div id="house"></div>
-<div id="hud">SIZE: <b id="hudF">24</b> | ZOOM: <b id="hudZ">1.0</b> | TILT: <b id="hudR">0</b>°</div>
+<div id="perimeter"></div>
+<input type="text" id="hiddenText">
 
-<input type="text" id="hiddenInput">
-
-<div id="sigPad">
+<div id="sig-zone">
     <canvas id="sigCanvas" style="width:100%; height:100%; touch-action:none;"></canvas>
-    <div style="position:absolute; bottom:10px; right:10px; display:flex; gap:10px;">
-        <button class="btn-main" onclick="closeSig(true)">STAMP SIG</button>
-        <button onclick="closeSig(false)" style="color:#ff073a; border-color:#ff073a;">CANCEL</button>
+    <div style="position:absolute; bottom:15px; width:100%; display:flex; justify-content:center; gap:10px;">
+        <button class="glass-pill btn-save" onclick="finishSig(true)">STAMP</button>
+        <button class="glass-pill" onclick="finishSig(false)">X</button>
     </div>
 </div>
 
-<div id="workspace">
+<div id="sliders">
+    <input type="range" id="fSize" min="10" max="800" value="40" oninput="sync()">
+    <input type="range" id="fRot" min="-180" max="180" value="0" oninput="sync()">
+</div>
+
+<div id="viewport">
     <div id="canvas-wrap" id="wrap">
-        <canvas id="mainCanvas"></canvas>
-        <div id="plate" id="plate">DOUBLE TAP TO TYPE</div>
+        <canvas id="mainDoc"></canvas>
+        <div id="stamp">DOUBLE TAP TO TYPE</div>
     </div>
 </div>
 
-<div id="controls">
-    <div class="row">
-        SIZE: <input type="range" id="fSize" min="8" max="600" value="30" oninput="update()">
-        TILT: <input type="range" id="rot" min="-180" max="180" value="0" oninput="update()">
-    </div>
-    <div class="row">
-        <button class="btn-main" onclick="stamp()">BURN INK</button>
-        <button onclick="toggleSig()">SIGN</button>
-        <button onclick="cycleNeon()">GLOW</button>
-        <button onclick="document.getElementById('loader').click()">LOAD</button>
-        <input type="file" id="loader" hidden accept="image/*">
-        <button onclick="undo()" style="color:#ff073a">UNDO</button>
-        <button onclick="exportImg()">EXPORT</button>
-    </div>
+<div id="ui-layer">
+    <button class="glass-pill" onclick="document.getElementById('fileIn').click()">LOAD</button>
+    <input type="file" id="fileIn" hidden accept="image/*">
+    <button class="glass-pill" onclick="toggleSign()">SIGN</button>
+    <button class="glass-pill" onclick="undoInk()">UNDO</button>
+    <button class="glass-pill btn-save" onclick="burnAndSave()">SAVE AS</button>
 </div>
 
 <script>
-    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
-    const wrap = document.getElementById('canvas-wrap'), plate = document.getElementById('plate');
-    const hInput = document.getElementById('hiddenInput'), sCanvas = document.getElementById('sigCanvas');
-    const sCtx = sCanvas.getContext('2d');
+    const canvas = document.getElementById('mainDoc'), ctx = canvas.getContext('2d');
+    const wrap = document.getElementById('canvas-wrap'), stamp = document.getElementById('stamp');
+    const hInput = document.getElementById('hiddenText'), sCanvas = document.getElementById('sigCanvas'), sCtx = sCanvas.getContext('2d');
     
-    let docImg = new Image(), zoom = 1.0, history = [], posX = 100, posY = 100, sigImg = null;
-    let textContent = "DOUBLE TAP";
-    const colors = ['#39FF14', '#00F3FF', '#FF073A', '#FFF000'];
-    let cIdx = 0;
+    let baseImg = new Image(), zoom = 1.0, history = [], posX = 50, posY = 50, sigImg = null;
+    let inkText = "DOUBLE TAP";
 
-    // Movement & Dragging
-    plate.addEventListener('touchstart', e => { if(e.touches.length === 1) e.preventDefault(); }, {passive: false});
-    plate.addEventListener('touchmove', e => {
+    // 1. Natural Edge-to-Edge Loading
+    document.getElementById('fileIn').onchange = e => {
+        const reader = new FileReader();
+        reader.onload = f => { 
+            baseImg.src = f.target.result; 
+            baseImg.onload = () => { 
+                canvas.width = baseImg.width; canvas.height = baseImg.height; 
+                saveState(); render(); 
+            }; 
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    function render() { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(baseImg, 0, 0); sync(); }
+
+    // 2. Smooth One-Finger Drag
+    stamp.addEventListener('touchstart', e => { if(e.touches.length === 1) e.preventDefault(); }, {passive: false});
+    stamp.addEventListener('touchmove', e => {
         const t = e.touches[0], r = canvas.getBoundingClientRect();
-        posX = (t.pageX - r.left)/zoom - (plate.offsetWidth/2);
-        posY = (t.pageY - r.top)/zoom - (plate.offsetHeight/2);
-        plate.style.left = posX + "px"; plate.style.top = posY + "px";
+        posX = (t.pageX - r.left)/zoom - (stamp.offsetWidth/2);
+        posY = (t.pageY - r.top)/zoom - (stamp.offsetHeight/2);
+        stamp.style.left = posX + "px"; stamp.style.top = posY + "px";
     });
 
-    // Double Tap to Type
+    // 3. Double-Tap to Focus Typing
     let lastTap = 0;
-    plate.addEventListener('touchend', e => {
+    stamp.addEventListener('touchend', () => {
         const now = Date.now();
-        if(now - lastTap < 300) { hInput.focus(); }
+        if(now - lastTap < 300) hInput.focus();
         lastTap = now;
     });
-    hInput.oninput = () => { textContent = hInput.value; sigImg = null; update(); };
+    hInput.oninput = () => { inkText = hInput.value; sigImg = null; sync(); };
 
-    // Pinch-to-Zoom (Smooth Logic)
-    let lastDist = 0;
+    // 4. Smooth Pinch-to-Zoom (Doc Only)
+    let startDist = 0;
     document.addEventListener('touchmove', e => {
         if (e.touches.length === 2) {
-            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            if (lastDist > 0) {
-                zoom = Math.max(0.1, zoom + (dist > lastDist ? 0.02 : -0.02));
-                update();
+            e.preventDefault();
+            let d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            if (startDist > 0) {
+                zoom = Math.max(0.05, zoom + (d > startDist ? 0.015 : -0.015));
+                sync();
             }
-            lastDist = dist;
+            startDist = d;
         }
     }, { passive: false });
-    document.addEventListener('touchend', () => lastDist = 0);
+    document.addEventListener('touchend', () => startDist = 0);
 
-    // Signature Logic
-    function toggleSig() { document.getElementById('sigPad').style.display = 'block'; sCanvas.width = sCanvas.offsetWidth; sCanvas.height = sCanvas.offsetHeight; }
+    // 5. Signature Logic
+    function toggleSign() { document.getElementById('sig-zone').style.display = 'block'; sCanvas.width = sCanvas.offsetWidth; sCanvas.height = sCanvas.offsetHeight; sCtx.clearRect(0,0,sCanvas.width,sCanvas.height); }
     let drawing = false;
-    sCanvas.addEventListener('touchstart', () => { drawing = true; sCtx.beginPath(); });
-    sCanvas.addEventListener('touchend', () => drawing = false);
-    sCanvas.addEventListener('touchmove', e => {
+    sCanvas.addEventListener('touchstart', (e) => { drawing = true; sCtx.beginPath(); const r = sCanvas.getBoundingClientRect(); sCtx.moveTo(e.touches[0].clientX - r.left, e.touches[0].clientY - r.top); });
+    sCanvas.addEventListener('touchmove', (e) => { 
         if(!drawing) return; e.preventDefault();
-        const t = e.touches[0], r = sCanvas.getBoundingClientRect();
+        const r = sCanvas.getBoundingClientRect();
         sCtx.lineWidth = 4; sCtx.lineCap = 'round'; sCtx.strokeStyle = '#000';
-        sCtx.lineTo(t.clientX - r.left, t.clientY - r.top); sCtx.stroke();
+        sCtx.lineTo(e.touches[0].clientX - r.left, e.touches[0].clientY - r.top); sCtx.stroke();
     });
-    function closeSig(keep) {
-        if(keep) { sigImg = new Image(); sigImg.src = sCanvas.toDataURL(); plate.innerHTML = ''; plate.appendChild(sigImg); }
-        document.getElementById('sigPad').style.display = 'none'; sCtx.clearRect(0,0,sCanvas.width,sCanvas.height);
+    function finishSig(keep) {
+        if(keep) { sigImg = new Image(); sigImg.src = sCanvas.toDataURL(); stamp.innerHTML = ''; stamp.appendChild(sigImg); }
+        document.getElementById('sig-zone').style.display = 'none'; drawing = false;
     }
 
-    // Color & UI
-    function cycleNeon() { cIdx = (cIdx + 1) % colors.length; document.documentElement.style.setProperty('--neon', colors[cIdx]); }
-    document.getElementById('loader').onchange = e => {
-        const r = new FileReader();
-        r.onload = f => { docImg.src = f.target.result; docImg.onload = () => { canvas.width = docImg.width; canvas.height = docImg.height; saveHistory(); draw(); }; };
-        r.readAsDataURL(e.target.files[0]);
-    };
-    function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(docImg, 0, 0); update(); }
-    function update() {
-        const s = document.getElementById('fSize').value, r = document.getElementById('rot').value;
-        document.getElementById('hudF').innerText = s; document.getElementById('hudZ').innerText = zoom.toFixed(1); document.getElementById('hudR').innerText = r;
+    function sync() {
+        const sz = document.getElementById('fSize').value, rt = document.getElementById('fRot').value;
         wrap.style.transform = `scale(${zoom})`;
-        if(!sigImg) plate.innerText = textContent;
-        plate.style.fontSize = s + "px"; plate.style.transform = `rotate(${r}deg)`;
+        if(!sigImg) stamp.innerText = inkText;
+        stamp.style.fontSize = sz + "px"; stamp.style.transform = `rotate(${rt}deg)`;
     }
 
-    function stamp() {
-        if(!docImg.src) return; saveHistory();
-        const s = document.getElementById('fSize').value, r = document.getElementById('rot').value * Math.PI / 180;
-        ctx.save(); ctx.translate(posX + plate.offsetWidth/2, posY + plate.offsetHeight/2); ctx.rotate(r);
-        if(sigImg) { ctx.drawImage(sigImg, -plate.offsetWidth/2, -plate.offsetHeight/2, plate.offsetWidth, plate.offsetHeight); sigImg = null; plate.innerHTML = ''; }
-        else { ctx.font = `bold ${s}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(textContent, 0, 0); }
-        ctx.restore(); docImg.src = canvas.toDataURL(); hInput.value = ""; textContent = "NEXT STAMP"; update();
+    // 6. The Burn & Save Logic
+    function burnAndSave() {
+        if(!baseImg.src) return;
+        saveState();
+        const sz = document.getElementById('fSize').value, rt = document.getElementById('fRot').value * Math.PI / 180;
+        ctx.save();
+        ctx.translate(posX + stamp.offsetWidth/2, posY + stamp.offsetHeight/2);
+        ctx.rotate(rt);
+        if(sigImg) {
+            ctx.drawImage(sigImg, -stamp.offsetWidth/2, -stamp.offsetHeight/2, stamp.offsetWidth, stamp.offsetHeight);
+            sigImg = null; stamp.innerHTML = '';
+        } else {
+            ctx.font = `bold ${sz}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(inkText, 0, 0);
+        }
+        ctx.restore();
+        baseImg.src = canvas.toDataURL(); // Update internal twin
+        
+        // Immediate Save As
+        const link = document.createElement('a');
+        link.download = `Sovereign_Lens_${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+        
+        hInput.value = ""; inkText = "NEXT STAMP"; sync();
     }
 
-    function saveHistory() { history.push(canvas.toDataURL()); if(history.length > 15) history.shift(); }
-    function undo() { if(history.length > 1) { history.pop(); docImg.src = history[history.length-1]; docImg.onload = () => draw(); } }
-    function exportImg() { const a = document.createElement('a'); a.download = "Final_Sovereign.png"; a.href = canvas.toDataURL(); a.click(); }
+    function saveState() { history.push(canvas.toDataURL()); if(history.length > 20) history.shift(); }
+    function undoInk() { if(history.length > 1) { history.pop(); baseImg.src = history[history.length-1]; baseImg.onload = () => render(); } }
 </script>
 </body>
 </html>
