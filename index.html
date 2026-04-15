@@ -3,77 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sovereign Stamper v1.8</title>
+    <title>Sovereign Stamper v1.9</title>
     <style>
-        :root { --neon: #39FF14; --bg: #111; }
-        body { margin: 0; background: var(--bg); color: var(--neon); font-family: monospace; overflow: hidden; touch-action: none; }
+        :root { --neon: #39FF14; }
+        body { margin: 0; background: #111; color: var(--neon); font-family: monospace; overflow: hidden; touch-action: none; }
         
-        /* The Neon Perimeter (User Choice) */
-        #house { position: fixed; inset: 5px; border: 3px solid var(--neon); pointer-events: none; z-index: 50; transition: border-color 0.3s; }
+        #house { position: fixed; inset: 4px; border: 2px solid var(--neon); pointer-events: none; z-index: 50; transition: border-color 0.3s; }
+        #hud { position: fixed; top: 10px; width: 100%; display: flex; justify-content: space-around; font-size: 10px; z-index: 100; pointer-events: none; }
         
-        #hud { position: fixed; top: 8px; width: 100%; display: flex; justify-content: space-around; font-size: 10px; z-index: 100; text-shadow: 1px 1px #000; }
-        
-        #workspace { width: 100vw; height: 100vh; overflow: auto; background: #222; position: relative; }
-        #canvas-wrap { position: absolute; transform-origin: 0 0; top: 45px; left: 10px; }
-        canvas { background: white; display: block; }
+        #workspace { width: 100vw; height: 100vh; overflow: auto; background: #1a1a1a; position: relative; }
+        #canvas-wrap { position: absolute; transform-origin: 0 0; top: 0; left: 0; padding: 200px; }
+        canvas { background: white; display: block; box-shadow: 0 0 40px #000; }
 
-        /* The Ghost Pen (Movable/Stretchable) */
+        /* Direct Interaction Plate */
         #plate { 
             position: absolute; z-index: 200; color: #000; 
-            background: rgba(255, 255, 255, 0.3); border: 1px dashed #555;
-            padding: 5px; cursor: move; touch-action: none;
+            background: rgba(255, 255, 255, 0.4); border: 1px dashed var(--neon);
+            padding: 8px; cursor: move; touch-action: none;
             display: inline-block; white-space: nowrap; font-weight: bold;
+            min-width: 20px; min-height: 20px;
         }
+
+        #hiddenInput { position: fixed; top: -100px; opacity: 0; }
 
         #sigPad { 
-            position: fixed; top: 20%; left: 10%; width: 80%; height: 30%; 
-            background: #fff; border: 2px solid var(--neon); z-index: 300; display: none; 
+            position: fixed; top: 15%; left: 5%; width: 90%; height: 40%; 
+            background: #fff; border: 3px solid var(--neon); z-index: 500; display: none; 
         }
 
-        #controls { position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid var(--neon); padding: 10px 5px 20px 5px; display: flex; flex-direction: column; gap: 6px; z-index: 400; }
-        .row { display: flex; gap: 4px; overflow-x: auto; padding: 2px; }
+        #controls { position: fixed; bottom: 0; width: 100%; background: rgba(0,0,0,0.9); border-top: 1px solid var(--neon); padding: 10px 0 25px 0; display: flex; flex-direction: column; gap: 8px; z-index: 400; }
+        .row { display: flex; gap: 5px; justify-content: center; padding: 0 10px; }
         
-        button, input { background: #111; color: var(--neon); border: 1px solid var(--neon); padding: 10px; font-size: 12px; border-radius: 4px; flex-shrink: 0; }
-        #textInput { flex-grow: 1; min-width: 100px; }
+        button, input[type="range"] { background: #000; color: var(--neon); border: 1px solid var(--neon); padding: 12px; font-size: 12px; border-radius: 4px; }
+        input[type="range"] { flex-grow: 1; }
+        .btn-main { background: var(--neon); color: #000; font-weight: bold; border: none; }
     </style>
 </head>
 <body>
 
 <div id="house"></div>
-<div id="hud">F: <b id="hudF">24</b> | Z: <b id="hudZ">1.0</b> | R: <b id="hudR">0</b>°</div>
+<div id="hud">SIZE: <b id="hudF">24</b> | ZOOM: <b id="hudZ">1.0</b> | TILT: <b id="hudR">0</b>°</div>
+
+<input type="text" id="hiddenInput">
 
 <div id="sigPad">
-    <canvas id="sigCanvas" style="width:100%; height:100%; background:transparent;"></canvas>
-    <div style="position:absolute; bottom:5px; right:5px;">
-        <button onclick="closeSig(true)">STAMP SIG</button>
-        <button onclick="closeSig(false)" style="color:red">X</button>
+    <canvas id="sigCanvas" style="width:100%; height:100%; touch-action:none;"></canvas>
+    <div style="position:absolute; bottom:10px; right:10px; display:flex; gap:10px;">
+        <button class="btn-main" onclick="closeSig(true)">STAMP SIG</button>
+        <button onclick="closeSig(false)" style="color:#ff073a; border-color:#ff073a;">CANCEL</button>
     </div>
 </div>
 
 <div id="workspace">
     <div id="canvas-wrap" id="wrap">
         <canvas id="mainCanvas"></canvas>
-        <div id="plate">DRAG ME</div>
+        <div id="plate" id="plate">DOUBLE TAP TO TYPE</div>
     </div>
 </div>
 
 <div id="controls">
     <div class="row">
-        <input type="text" id="textInput" placeholder="Ink..." oninput="update()">
-        <button onclick="stamp()" style="background:var(--neon); color:#000;">BURN</button>
+        SIZE: <input type="range" id="fSize" min="8" max="600" value="30" oninput="update()">
+        TILT: <input type="range" id="rot" min="-180" max="180" value="0" oninput="update()">
+    </div>
+    <div class="row">
+        <button class="btn-main" onclick="stamp()">BURN INK</button>
         <button onclick="toggleSig()">SIGN</button>
-    </div>
-    <div class="row">
-        Size: <input type="range" id="fSize" min="10" max="200" value="24" oninput="update()">
-        Tilt: <input type="range" id="rot" min="-180" max="180" value="0" oninput="update()">
-    </div>
-    <div class="row">
         <button onclick="cycleNeon()">GLOW</button>
         <button onclick="document.getElementById('loader').click()">LOAD</button>
         <input type="file" id="loader" hidden accept="image/*">
-        <button onclick="changeZoom(0.2)">Z+</button>
-        <button onclick="changeZoom(-0.2)">Z-</button>
-        <button onclick="undo()">UNDO</button>
+        <button onclick="undo()" style="color:#ff073a">UNDO</button>
         <button onclick="exportImg()">EXPORT</button>
     </div>
 </div>
@@ -81,18 +80,16 @@
 <script>
     const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
     const wrap = document.getElementById('canvas-wrap'), plate = document.getElementById('plate');
-    const house = document.getElementById('house'), textInput = document.getElementById('textInput');
-    const sCanvas = document.getElementById('sigCanvas'), sCtx = sCanvas.getContext('2d');
+    const hInput = document.getElementById('hiddenInput'), sCanvas = document.getElementById('sigCanvas');
+    const sCtx = sCanvas.getContext('2d');
     
-    let docImg = new Image(), zoom = 1.0, history = [], posX = 20, posY = 20, sigImg = null;
+    let docImg = new Image(), zoom = 1.0, history = [], posX = 100, posY = 100, sigImg = null;
+    let textContent = "DOUBLE TAP";
     const colors = ['#39FF14', '#00F3FF', '#FF073A', '#FFF000'];
     let cIdx = 0;
 
-    // Cycle Neon Border
-    function cycleNeon() { cIdx = (cIdx + 1) % colors.length; document.documentElement.style.setProperty('--neon', colors[cIdx]); }
-
-    // Floating Plate Movement
-    plate.addEventListener('touchstart', e => e.preventDefault());
+    // Movement & Dragging
+    plate.addEventListener('touchstart', e => { if(e.touches.length === 1) e.preventDefault(); }, {passive: false});
     plate.addEventListener('touchmove', e => {
         const t = e.touches[0], r = canvas.getBoundingClientRect();
         posX = (t.pageX - r.left)/zoom - (plate.offsetWidth/2);
@@ -100,23 +97,47 @@
         plate.style.left = posX + "px"; plate.style.top = posY + "px";
     });
 
+    // Double Tap to Type
+    let lastTap = 0;
+    plate.addEventListener('touchend', e => {
+        const now = Date.now();
+        if(now - lastTap < 300) { hInput.focus(); }
+        lastTap = now;
+    });
+    hInput.oninput = () => { textContent = hInput.value; sigImg = null; update(); };
+
+    // Pinch-to-Zoom (Smooth Logic)
+    let lastDist = 0;
+    document.addEventListener('touchmove', e => {
+        if (e.touches.length === 2) {
+            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            if (lastDist > 0) {
+                zoom = Math.max(0.1, zoom + (dist > lastDist ? 0.02 : -0.02));
+                update();
+            }
+            lastDist = dist;
+        }
+    }, { passive: false });
+    document.addEventListener('touchend', () => lastDist = 0);
+
     // Signature Logic
     function toggleSig() { document.getElementById('sigPad').style.display = 'block'; sCanvas.width = sCanvas.offsetWidth; sCanvas.height = sCanvas.offsetHeight; }
     let drawing = false;
-    sCanvas.addEventListener('touchstart', () => drawing = true);
+    sCanvas.addEventListener('touchstart', () => { drawing = true; sCtx.beginPath(); });
     sCanvas.addEventListener('touchend', () => drawing = false);
     sCanvas.addEventListener('touchmove', e => {
-        if(!drawing) return;
+        if(!drawing) return; e.preventDefault();
         const t = e.touches[0], r = sCanvas.getBoundingClientRect();
-        sCtx.lineWidth = 3; sCtx.lineCap = 'round'; sCtx.strokeStyle = '#000';
-        sCtx.lineTo(t.clientX - r.left, t.clientY - r.top); sCtx.stroke(); sCtx.beginPath(); sCtx.moveTo(t.clientX - r.left, t.clientY - r.top);
+        sCtx.lineWidth = 4; sCtx.lineCap = 'round'; sCtx.strokeStyle = '#000';
+        sCtx.lineTo(t.clientX - r.left, t.clientY - r.top); sCtx.stroke();
     });
     function closeSig(keep) {
         if(keep) { sigImg = new Image(); sigImg.src = sCanvas.toDataURL(); plate.innerHTML = ''; plate.appendChild(sigImg); }
         document.getElementById('sigPad').style.display = 'none'; sCtx.clearRect(0,0,sCanvas.width,sCanvas.height);
     }
 
-    // Load & Draw
+    // Color & UI
+    function cycleNeon() { cIdx = (cIdx + 1) % colors.length; document.documentElement.style.setProperty('--neon', colors[cIdx]); }
     document.getElementById('loader').onchange = e => {
         const r = new FileReader();
         r.onload = f => { docImg.src = f.target.result; docImg.onload = () => { canvas.width = docImg.width; canvas.height = docImg.height; saveHistory(); draw(); }; };
@@ -127,7 +148,7 @@
         const s = document.getElementById('fSize').value, r = document.getElementById('rot').value;
         document.getElementById('hudF').innerText = s; document.getElementById('hudZ').innerText = zoom.toFixed(1); document.getElementById('hudR').innerText = r;
         wrap.style.transform = `scale(${zoom})`;
-        if(!sigImg) plate.innerText = textInput.value || "DRAG ME";
+        if(!sigImg) plate.innerText = textContent;
         plate.style.fontSize = s + "px"; plate.style.transform = `rotate(${r}deg)`;
     }
 
@@ -136,14 +157,13 @@
         const s = document.getElementById('fSize').value, r = document.getElementById('rot').value * Math.PI / 180;
         ctx.save(); ctx.translate(posX + plate.offsetWidth/2, posY + plate.offsetHeight/2); ctx.rotate(r);
         if(sigImg) { ctx.drawImage(sigImg, -plate.offsetWidth/2, -plate.offsetHeight/2, plate.offsetWidth, plate.offsetHeight); sigImg = null; plate.innerHTML = ''; }
-        else { ctx.font = `bold ${s}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(textInput.value, 0, 0); }
-        ctx.restore(); docImg.src = canvas.toDataURL(); textInput.value = ""; update();
+        else { ctx.font = `bold ${s}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(textContent, 0, 0); }
+        ctx.restore(); docImg.src = canvas.toDataURL(); hInput.value = ""; textContent = "NEXT STAMP"; update();
     }
 
-    function changeZoom(v) { zoom = Math.max(0.1, zoom + v); update(); }
-    function saveHistory() { history.push(canvas.toDataURL()); if(history.length > 10) history.shift(); }
+    function saveHistory() { history.push(canvas.toDataURL()); if(history.length > 15) history.shift(); }
     function undo() { if(history.length > 1) { history.pop(); docImg.src = history[history.length-1]; docImg.onload = () => draw(); } }
-    function exportImg() { const a = document.createElement('a'); a.download = "Sovereign_Doc.png"; a.href = canvas.toDataURL(); a.click(); }
+    function exportImg() { const a = document.createElement('a'); a.download = "Final_Sovereign.png"; a.href = canvas.toDataURL(); a.click(); }
 </script>
 </body>
 </html>
